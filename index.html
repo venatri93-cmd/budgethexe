@@ -6,10 +6,37 @@
 <meta name="theme-color" content="#0d0b14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="BudgetHex">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
-<title>BudgetHex</title>
+<meta name="apple-mobile-web-app-title" content="BudgetHexe">
+<title>BudgetHexe</title>
+<script>
+// Inline manifest so no external file needed
+const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="36" fill="#0d0b14"/><polygon points="96,24 140,56 140,136 96,168 52,136 52,56" fill="#4c1d95"/><polygon points="96,24 140,56 96,80" fill="#7c3aed"/><polygon points="96,24 52,56 96,80" fill="#5b21b6"/><polygon points="52,56 96,80 52,136" fill="#3b0764"/><polygon points="140,56 140,136 96,80" fill="#6d28d9"/><polygon points="52,136 96,80 96,168" fill="#2e1065"/><polygon points="140,136 96,168 96,80" fill="#4c1d95"/><ellipse cx="116" cy="52" rx="10" ry="5" fill="rgba(220,200,255,0.6)" transform="rotate(-20,116,52)"/></svg>`;
+const svgBlob = new Blob([iconSvg], {type:'image/svg+xml'});
+const iconUrl = URL.createObjectURL(svgBlob);
+const manifest = {
+  name: 'BudgetHexe',
+  short_name: 'BudgetHexe',
+  description: 'Dein magisches Finanz-Grimoire',
+  start_url: './',
+  display: 'standalone',
+  background_color: '#0d0b14',
+  theme_color: '#0d0b14',
+  orientation: 'any',
+  icons: [
+    {src: iconUrl, sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable'},
+    {src: iconUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable'}
+  ]
+};
+const mBlob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+const mUrl = URL.createObjectURL(mBlob);
+const mLink = document.createElement('link');
+mLink.rel = 'manifest'; mLink.href = mUrl;
+document.currentScript.after(mLink);
+// Apple touch icon
+const aLink = document.createElement('link');
+aLink.rel = 'apple-touch-icon'; aLink.href = iconUrl;
+document.currentScript.after(aLink);
+</script>
 <style>
 :root {
   --bg: #0d0b14;
@@ -447,7 +474,7 @@ body {
 <!-- LOGIN -->
 <div id="login-screen">
   <div class="login-gem">💎</div>
-  <div class="login-title">BudgetHex</div>
+  <div class="login-title">BudgetHexe</div>
   <div class="login-sub">Dein magisches Finanz-Grimoire ✨</div>
   <div class="login-form">
     <div class="form-group">
@@ -456,23 +483,31 @@ body {
     </div>
     <div class="form-group">
       <label class="form-label">Passwort</label>
-      <input class="form-input" id="lp" type="password" placeholder="••••••••" autocomplete="current-password">
+      <div style="position:relative">
+        <input class="form-input" id="lp" type="password" placeholder="&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;" autocomplete="current-password" style="padding-right:44px">
+        <button onclick="togglePw()" id="pw-eye" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1rem;line-height:1;color:var(--muted)">&#128065;</button>
+      </div>
     </div>
-    <button class="btn btn-primary" onclick="doLogin()">✨ Eintreten</button>
+    <button class="btn btn-primary" onclick="doLogin()">&#10024; Eintreten</button>
   </div>
 </div>
 
 <!-- APP -->
 <div id="app-screen">
+  <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:4px 16px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:0.72rem" id="db-status-bar">
+    <span id="db-dot-app" style="width:7px;height:7px;border-radius:50%;background:var(--muted);display:inline-block"></span>
+    <span id="db-text-app" style="color:var(--muted)">Verbinde...</span>
+  </div>
   <div class="app-header">
-    <h1>💎 BudgetHex</h1>
+    <h1>&#x1F48E; BudgetHexe</h1>
     <div style="display:flex;align-items:center;gap:8px">
-      <button id="install-btn" onclick="installPWA()" style="display:none;background:var(--accent-glow);border:1px solid var(--accent);color:var(--accent);border-radius:16px;padding:5px 12px;font-size:0.75rem;font-family:inherit;cursor:pointer;font-weight:600">📲 Installieren</button>
+      <button id="install-btn" onclick="installPWA()" style="display:none;background:var(--accent-glow);border:1px solid var(--accent);color:var(--accent);border-radius:16px;padding:5px 12px;font-size:0.75rem;font-family:inherit;cursor:pointer;font-weight:600">&#x1F4F2; Installieren</button>
       <div class="month-pill">
-        <button onclick="changeMonth(-1)">‹</button>
-        <span id="month-lbl">–</span>
-        <button onclick="changeMonth(1)">›</button>
+        <button onclick="changeMonth(-1)">&#x2039;</button>
+        <span id="month-lbl">&#x2013;</span>
+        <button onclick="changeMonth(1)">&#x203A;</button>
       </div>
+      <button onclick="doLogout()" title="Ausloggen" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:50%;width:28px;height:28px;font-size:0.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">&#x23CF;</button>
     </div>
   </div>
   <div class="tab-bar">
@@ -597,8 +632,8 @@ body {
     <div class="modal-handle"></div>
     <div class="modal-title" id="m-simple-title">Einnahme</div>
     <div class="form-group">
-      <label class="form-label">Emoji</label>
-      <input class="form-input" id="ms-emoji" type="text" maxlength="4" placeholder="💰">
+      <label class="form-label">Emoji (auf Handy: 😊-Taste, auf PC: Win+. oder Cmd+Ctrl+Space)</label>
+      <input class="form-input" id="ms-emoji" type="text" maxlength="4" placeholder="Emoji eintippen oder kopieren">
     </div>
     <div class="form-group">
       <label class="form-label">Bezeichnung</label>
@@ -624,8 +659,8 @@ body {
     <div class="modal-handle"></div>
     <div class="modal-title" id="m-topf-title">Sparplan</div>
     <div class="form-group">
-      <label class="form-label">Emoji</label>
-      <input class="form-input" id="mt-emoji" type="text" maxlength="4" placeholder="🫙">
+      <label class="form-label">Emoji (auf Handy: 😊-Taste, auf PC: Win+. oder Cmd+Ctrl+Space)</label>
+      <input class="form-input" id="mt-emoji" type="text" maxlength="4" placeholder="Emoji eintippen oder kopieren">
     </div>
     <div class="form-group">
       <label class="form-label">Name</label>
@@ -707,6 +742,36 @@ async function api(path, method='GET', body=null) {
   return r.status===204?null:r.json();
 }
 
+// ── PW TOGGLE ──
+function togglePw() {
+  const inp = document.getElementById('lp');
+  const btn = document.getElementById('pw-eye');
+  if(inp.type === 'password') {
+    inp.type = 'text';
+    btn.innerHTML = '&#128064;'; // eyes open
+  } else {
+    inp.type = 'password';
+    btn.innerHTML = '&#128065;'; // eye
+  }
+}
+
+// ── DB STATUS ──
+async function checkDbStatus() {
+  try {
+    await fetch(SB_URL + '/rest/v1/', { headers: { 'apikey': SB_KEY } });
+    setDbStatus(true);
+  } catch(e) { setDbStatus(false); }
+}
+function setDbStatus(ok) {
+  const col = ok ? 'var(--success)' : 'var(--danger)';
+  const txt = ok ? 'Verbunden' : 'Keine Verbindung';
+  const dot = document.getElementById('db-dot-app');
+  const text = document.getElementById('db-text-app');
+  if(dot) dot.style.background = col;
+  if(text) { text.textContent = txt; text.style.color = col; }
+}
+checkDbStatus();
+
 // ── LOGIN ──
 async function doLogin() {
   const u=document.getElementById('lu').value.trim();
@@ -715,15 +780,43 @@ async function doLogin() {
   UH=HASH_PFX+u+'_'+p;
   try {
     await loadAll();
-    document.getElementById('login-screen').style.display='none';
-    document.getElementById('app-screen').style.display='flex';
-    document.getElementById('fab').style.display='flex';
-    document.getElementById('month-lbl').textContent=monthLabel(CUR);
-    renderAll();
+    localStorage.setItem('bh_uh', UH);
+    showApp();
     toast('Willkommen \u2728','ok');
   } catch(e){ toast('Fehler beim Login','err'); UH=null; console.error(e); }
 }
 document.getElementById('lp').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+
+function showApp() {
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app-screen').style.display='flex';
+  document.getElementById('fab').style.display='flex';
+  document.getElementById('month-lbl').textContent=monthLabel(CUR);
+  renderAll();
+}
+
+function doLogout() {
+  if(!confirm('Ausloggen?')) return;
+  localStorage.removeItem('bh_uh');
+  UH=null;
+  DATA={ein:[],fest:[],fix:[],sonst:[],topf:[],challenge:[],quick:[]};
+  document.getElementById('app-screen').style.display='none';
+  document.getElementById('fab').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('lu').value='';
+  document.getElementById('lp').value='';
+}
+
+// ── AUTO LOGIN ──
+(async function autoLogin() {
+  const saved = localStorage.getItem('bh_uh');
+  if(!saved) return;
+  UH = saved;
+  try {
+    await loadAll();
+    showApp();
+  } catch(e) { localStorage.removeItem('bh_uh'); UH=null; }
+})();
 
 // ── MONTH NAV ──
 function changeMonth(d) {
