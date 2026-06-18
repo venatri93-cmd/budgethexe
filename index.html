@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#0d0b14">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BudgetHex">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>BudgetHex</title>
 <style>
 :root {
@@ -25,64 +29,37 @@
   --mono: 'Courier New', monospace;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-html { height: 100%; }
+html, body { height: 100%; }
 body {
   background: var(--bg);
   color: var(--text);
   font-family: system-ui, -apple-system, sans-serif;
-  min-height: 100%;
   display: flex;
   flex-direction: column;
+  align-items: center;
 }
 
-/* DESKTOP WRAPPER */
+/* WRAPPER – zentriert auf Desktop, full-width auf Handy */
 .app-wrapper {
+  width: 100%;
+  max-width: 680px;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  width: 100%;
-  max-width: 900px;
-  margin: 0 auto;
-  min-height: 100vh;
+  position: relative;
 }
 
 @media (min-width: 700px) {
-  body { background: #080610; }
+  body { background: #07050f; }
   .app-wrapper {
-    margin: 0 auto;
     background: var(--bg);
-    box-shadow: 0 0 80px rgba(167,139,250,0.08);
+    box-shadow: 0 0 60px rgba(167,139,250,0.1), 0 0 0 1px rgba(167,139,250,0.08);
+    min-height: 100vh;
   }
-  #app-screen {
-    flex-direction: row !important;
-    align-items: stretch;
-  }
-  /* Sidebar nav on desktop */
-  .tab-bar {
-    flex-direction: column !important;
-    width: 120px !important;
-    border-bottom: none !important;
-    border-right: 1px solid var(--border) !important;
-    padding: 16px 0;
-    flex-shrink: 0;
-  }
-  .tab-btn {
-    border-bottom: none !important;
-    border-right: 3px solid transparent;
-    border-left: 3px solid transparent;
-    padding: 14px 8px !important;
-  }
-  .tab-btn.active {
-    border-right-color: var(--accent) !important;
-    border-bottom: none !important;
-    background: var(--accent-glow);
-  }
-  .scroll-area {
-    flex: 1;
-    padding: 20px 24px 40px !important;
-  }
-  .hero-amount { font-size: 3.2rem !important; }
-  .fab { bottom: 32px !important; right: 32px !important; }
-  .quick-grid { grid-template-columns: repeat(5, 1fr) !important; }
+  .scroll-area { padding: 20px 28px 80px; }
+  .hero-amount { font-size: 3rem; }
+  .quick-grid { grid-template-columns: repeat(5, 1fr); }
+  .fab { right: calc(50% - 340px + 20px); }
 }
 
 /* SCREENS */
@@ -96,7 +73,7 @@ body {
   overflow-y: auto;
   min-height: 100vh;
 }
-#app-screen { flex: 1; display: none; flex-direction: column; min-height: 0; }
+#app-screen { flex: 1; display: none; flex-direction: column; height: 100vh; }
 
 /* HEADER */
 .app-header {
@@ -489,10 +466,13 @@ body {
 <div id="app-screen">
   <div class="app-header">
     <h1>💎 BudgetHex</h1>
-    <div class="month-pill">
-      <button onclick="changeMonth(-1)">‹</button>
-      <span id="month-lbl">–</span>
-      <button onclick="changeMonth(1)">›</button>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button id="install-btn" onclick="installPWA()" style="display:none;background:var(--accent-glow);border:1px solid var(--accent);color:var(--accent);border-radius:16px;padding:5px 12px;font-size:0.75rem;font-family:inherit;cursor:pointer;font-weight:600">📲 Installieren</button>
+      <div class="month-pill">
+        <button onclick="changeMonth(-1)">‹</button>
+        <span id="month-lbl">–</span>
+        <button onclick="changeMonth(1)">›</button>
+      </div>
     </div>
   </div>
   <div class="tab-bar">
@@ -1221,6 +1201,39 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 ['m-simple','m-topf','m-challenge'].forEach(id=>{
   document.getElementById(id).addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal(id);});
 });
+
+// ── PWA INSTALL ──
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('install-btn').style.display = 'block';
+});
+async function installPWA() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  if (outcome === 'accepted') {
+    document.getElementById('install-btn').style.display = 'none';
+    toast('\u{1F4F1} App installiert! \u2728', 'ok');
+  }
+  deferredPrompt = null;
+}
+window.addEventListener('appinstalled', () => {
+  document.getElementById('install-btn').style.display = 'none';
+});
+
+// ── SERVICE WORKER ──
+if ('serviceWorker' in navigator) {
+  const sw = `
+const CACHE = 'budgethex-v1';
+self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html']))));
+self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => caches.match(e.request))));
+`;
+  const blob = new Blob([sw], {type: 'application/javascript'});
+  const url = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(url).catch(()=>{});
+}
 </script>
 </div><!-- /app-wrapper -->
 </body>
