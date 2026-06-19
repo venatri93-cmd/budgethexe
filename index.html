@@ -904,16 +904,17 @@ function calcSums() {
   const fix_ist = DATA.fix.reduce((s,r)=>s+Number(r.ist||0),0);
   const fix_budget = DATA.fix.reduce((s,r)=>s+Number(r.budget||0),0);
   const sonst = DATA.sonst.reduce((s,r)=>s+Number(r.amount||0),0);
-  const quick = DATA.quick.reduce((s,r)=>s+Number(r.amount||0),0);
+  const quick_sonst = DATA.quick.filter(r=>!r.cat_id).reduce((s,r)=>s+Number(r.amount||0),0);
+  const quick_fix = DATA.quick.filter(r=>r.cat_id).reduce((s,r)=>s+Number(r.amount||0),0);
   const sparen = DATA.topf.reduce((s,r)=>s+Number(r.monthly||0),0);
   const challenge = DATA.challenge.reduce((s,r)=>s+Number(r.monthly||0),0);
-  const totalAusg = fest + fix_ist + sonst + quick + sparen + challenge;
+  const totalAusg = fest + fix_ist + sonst + quick_sonst + sparen + challenge;
   const frei = ein - totalAusg;
   // Kontostand: alles was theoretisch weggeht (fix mit Budget statt Ist)
   // Quick-Buchungen die KEINER Fix-Kategorie zugeordnet sind extra zählen
-  const quick_ohne_fix = DATA.quick.filter(r=>!r.cat_id).reduce((s,r)=>s+Number(r.amount||0),0);
-  const kontostand = ein - fest - fix_budget - quick_ohne_fix - (sonst) - sparen - challenge;
-  return {ein, fest, fix_ist, fix_budget, sonst, quick, sparen, challenge, totalAusg, frei, kontostand};
+  const quick_ohne_fix = quick_sonst;
+  const kontostand = ein - fest - fix_budget - quick_ohne_fix - sonst - sparen - challenge;
+  return {ein, fest, fix_ist, fix_budget, sonst, quick:quick_sonst, quick_fix, sparen, challenge, totalAusg, frei, kontostand};
 }
 
 // ── RENDER ALL ──
