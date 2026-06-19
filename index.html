@@ -605,14 +605,16 @@ body {
     <!-- SPAREN -->
     <div class="page" id="page-sparen">
       <div class="sec-head">
-        <div class="sec-title">Sparziele &amp; Challenges</div>
+        <div class="sec-title">Sparziele</div>
         <button class="sec-add" onclick="openModal('topf')">＋ Neuer Topf</button>
       </div>
       <div id="list-topf"></div>
 
-      <div class="sec-head" style="margin-top:16px"><div class="sec-title">Challenges</div></div>
+      <div class="sec-head" style="margin-top:16px">
+        <div class="sec-title">Challenges</div>
+        <button class="sec-add" onclick="openModal('challenge')">＋ Neue Challenge</button>
+      </div>
       <div id="list-challenge"></div>
-      <button class="sec-add" style="width:100%;padding:10px;margin-top:4px" onclick="openModal('challenge')">＋ Neue Challenge</button>
     </div>
   </div>
 </div>
@@ -682,6 +684,10 @@ body {
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-title" id="m-chal-title">Challenge</div>
+    <div class="form-group">
+      <label class="form-label">Emoji</label>
+      <input class="form-input" id="mc-emoji" type="text" maxlength="4" placeholder="🏆">
+    </div>
     <div class="form-group">
       <label class="form-label">Name</label>
       <input class="form-input" id="mc-name" type="text" placeholder="z.B. Rubbel-Lotterie">
@@ -1102,7 +1108,7 @@ function renderSparen() {
   else {
     ec.innerHTML=DATA.challenge.map(c=>`<div class="data-row" style="flex-direction:column;align-items:stretch;gap:6px">
       <div style="display:flex;align-items:center;gap:8px">
-        <div class="row-emoji">\u{1F3C6}</div>
+        <div class="row-emoji">${c.emoji||'\u{1F3C6}'}</div>
         <div style="flex:1">
           <div class="row-name">${h(c.name)}</div>
           <div class="row-sub">Basis: ${eur(c.basis)} | Monat: +${eur(c.monthly)} | Gesamt: ${eur(c.total)}</div>
@@ -1263,7 +1269,7 @@ async function deleteTopfById(id) {
 // CHALLENGE MODAL
 function _openChallengeModal() {
   editCtx={type:'challenge',id:null};
-  ['mc-name','mc-basis','mc-monthly','mc-total'].forEach(id=>document.getElementById(id).value='');
+  ['mc-emoji','mc-name','mc-basis','mc-monthly','mc-total'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('mc-del-btn').style.display='none';
   document.getElementById('m-chal-title').textContent='Neue Challenge';
   document.getElementById('m-challenge').classList.add('open');
@@ -1271,6 +1277,7 @@ function _openChallengeModal() {
 function _openChallengeEdit(id) {
   const c=DATA.challenge.find(r=>r.id===id); if(!c) return;
   editCtx={type:'challenge',id};
+  document.getElementById('mc-emoji').value=c.emoji||'';
   document.getElementById('mc-name').value=c.name||'';
   document.getElementById('mc-basis').value=c.basis||'';
   document.getElementById('mc-monthly').value=c.monthly||'';
@@ -1280,12 +1287,13 @@ function _openChallengeEdit(id) {
   document.getElementById('m-challenge').classList.add('open');
 }
 async function saveChallenge() {
+  const emoji=document.getElementById('mc-emoji').value.trim()||'\u{1F3C6}';
   const name=document.getElementById('mc-name').value.trim();
   const basis=parseFloat(document.getElementById('mc-basis').value)||0;
   const monthly=parseFloat(document.getElementById('mc-monthly').value)||0;
   const total=parseFloat(document.getElementById('mc-total').value)||0;
   if(!name){toast('Name fehlt','err');return;}
-  const payload={user_hash:UH,name,basis,monthly,total};
+  const payload={user_hash:UH,emoji,name,basis,monthly,total};
   try {
     if(editCtx.id) await api(`bh_challenge?id=eq.${editCtx.id}&user_hash=eq.${encodeURIComponent(UH)}`,'PATCH',payload);
     else await api('bh_challenge','POST',payload);
