@@ -557,6 +557,20 @@ body {
           </div>
         </div>
       </div>
+      <div class="card" style="margin-bottom:10px">
+        <div class="card-title">&#x1F3E6; Theoretischer Kontostand</div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div>
+            <div class="hero-amount" id="h-konto" style="font-size:1.8rem">&#x20AC; &#x2013;</div>
+            <div style="font-size:0.7rem;color:var(--muted);margin-top:3px">wenn alle Budgets &amp; Ausgaben abgezogen</div>
+          </div>
+          <div style="text-align:right;font-size:0.75rem;color:var(--muted);line-height:1.8">
+            <div>Feste Ausg.: <span id="k-fest" style="color:var(--danger)">&#x20AC; &#x2013;</span></div>
+            <div>Budgets (Soll): <span id="k-fix" style="color:var(--danger)">&#x20AC; &#x2013;</span></div>
+            <div>Sparen: <span id="k-spar" style="color:var(--accent)">&#x20AC; &#x2013;</span></div>
+          </div>
+        </div>
+      </div>
       <div class="sec-head"><div class="sec-title">Budget-Status</div></div>
       <div id="home-budget"></div>
       <div class="sec-head"><div class="sec-title">Letzte Buchungen</div></div>
@@ -869,13 +883,18 @@ function calcSums() {
   const ein = DATA.ein.reduce((s,r)=>s+Number(r.amount||0),0);
   const fest = DATA.fest.reduce((s,r)=>s+Number(r.amount||0),0);
   const fix_ist = DATA.fix.reduce((s,r)=>s+Number(r.ist||0),0);
+  const fix_budget = DATA.fix.reduce((s,r)=>s+Number(r.budget||0),0);
   const sonst = DATA.sonst.reduce((s,r)=>s+Number(r.amount||0),0);
   const quick = DATA.quick.reduce((s,r)=>s+Number(r.amount||0),0);
   const sparen = DATA.topf.reduce((s,r)=>s+Number(r.monthly||0),0);
   const challenge = DATA.challenge.reduce((s,r)=>s+Number(r.monthly||0),0);
   const totalAusg = fest + fix_ist + sonst + quick + sparen + challenge;
   const frei = ein - totalAusg;
-  return {ein, fest, fix_ist, sonst, quick, sparen, challenge, totalAusg, frei};
+  // Kontostand: alles was theoretisch weggeht (fix mit Budget statt Ist)
+  // Quick-Buchungen die KEINER Fix-Kategorie zugeordnet sind extra zählen
+  const quick_ohne_fix = DATA.quick.filter(r=>!r.cat_id).reduce((s,r)=>s+Number(r.amount||0),0);
+  const kontostand = ein - fest - fix_budget - quick_ohne_fix - (sonst) - sparen - challenge;
+  return {ein, fest, fix_ist, fix_budget, sonst, quick, sparen, challenge, totalAusg, frei, kontostand};
 }
 
 // ── RENDER ALL ──
@@ -892,6 +911,13 @@ function renderHome() {
   document.getElementById('h-ein').textContent=eur(s.ein);
   document.getElementById('h-fest').textContent=eur(s.fest+s.fix_ist);
   document.getElementById('h-sonst').textContent=eur(s.sonst+s.quick);
+  // Kontostand
+  const kEl=document.getElementById('h-konto');
+  kEl.textContent=eur(s.kontostand);
+  kEl.className='hero-amount '+(s.kontostand>=0?'pos':'neg');
+  document.getElementById('k-fest').textContent=eur(s.fest);
+  document.getElementById('k-fix').textContent=eur(s.fix_budget);
+  document.getElementById('k-spar').textContent=eur(s.sparen+s.challenge);
 
   // Budget bars for fix
   const bb=document.getElementById('home-budget');
@@ -1082,9 +1108,13 @@ function renderAbschluss() {
       <span style="color:var(--muted)">${lbl}</span>
       <span style="font-family:var(--mono);color:${col}">${eur(val)}</span>
     </div>`).join('')+
-    `<div style="display:flex;justify-content:space-between;padding:8px 0;margin-top:4px">
-      <span style="font-weight:700;font-size:0.9rem">FREI / \u00dcBRIG</span>
-      <span style="font-family:var(--mono);font-weight:700;font-size:1.1rem;color:${s.frei>=0?'var(--success)':'var(--danger)'}">${eur(s.frei)}</span>
+    `<div style="display:flex;justify-content:space-between;padding:8px 0;margin-top:4px;border-bottom:1px solid var(--border)">
+      <span style="font-weight:700;font-size:0.9rem">FREI / \u00dcBRIG (aktuell)</span>
+      <span style="font-family:var(--mono);font-weight:700;font-size:1rem;color:${s.frei>=0?'var(--success)':'var(--danger)'}">${eur(s.frei)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:8px 0">
+      <span style="font-weight:700;font-size:0.9rem">\u{1F3E6} Kontostand (theoretisch)</span>
+      <span style="font-family:var(--mono);font-weight:700;font-size:1rem;color:${s.kontostand>=0?'var(--success)':'var(--danger)'}">${eur(s.kontostand)}</span>
     </div>`;
 }
 
