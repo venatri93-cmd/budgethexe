@@ -751,7 +751,7 @@ const HASH_PFX = 'nt5_';
 // ── STATE ──
 let UH = null; // user hash
 let CUR = new Date().toISOString().slice(0,7); // YYYY-MM
-let DATA = { ein:[], fest:[], fix:[], sonst:[], topf:[], challenge:[], quick:[] };
+let DATA = { ein:[], fest:[], fix:[], sonst:[], topf:[], challenge:[], quick:[], topf_checks:[], topf_einzahlungen:[] };
 let editCtx = { type: null, id: null };
 let qSelCat = null;
 
@@ -872,9 +872,11 @@ async function loadAll() {
     api(`bh_sonst?${q}&order=sort_order.asc,created_at.desc`).catch(()=>[]),
     api(`bh_quick?${q}&order=created_at.desc&limit=30`).catch(()=>[]),
   ]);
-  [DATA.topf, DATA.challenge] = await Promise.all([
+  [DATA.topf, DATA.challenge, DATA.topf_checks, DATA.topf_einzahlungen] = await Promise.all([
     api(`bh_topf?${qAll}&order=sort_order.asc,created_at.asc`).catch(()=>[]),
     api(`bh_challenge?${qAll}&order=sort_order.asc,created_at.asc`).catch(()=>[]),
+    api(`bh_topf_check?user_hash=eq.${enc}&month=eq.${CUR}`).catch(()=>[]),
+    api(`bh_topf_einzahlung?user_hash=eq.${enc}&month=eq.${CUR}&order=created_at.desc`).catch(()=>[]),
   ]);
 }
 
@@ -1151,12 +1153,25 @@ function renderSparen() {
   const el=document.getElementById('list-topf');
   if(!DATA.topf.length){ el.innerHTML='<div class="empty"><div class="empty-icon">\u{1F4B0}</div>Noch keine Sparziele</div>'; }
   else {
-    el.innerHTML=DATA.topf.map((t,i)=>`<div class="topf-card" draggable="true" data-id="${t.id}" data-type="topf" data-idx="${i}">
+    el.innerHTML=DATA.topf.map((t,i)=>{
+      const checked = DATA.topf_checks.some(c=>c.topf_id===t.id);
+      const einzahlungen = DATA.topf_einzahlungen.filter(e=>e.topf_id===t.id);
+      const histHtml = einzahlungen.length ? `
+        <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
+          ${einzahlungen.map(e=>`
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;padding:3px 0">
+              <span style="color:var(--muted)">${new Date(e.created_at).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}</span>
+              <span style="font-family:var(--mono);color:var(--success)">+${eur(e.amount)}</span>
+              <button onclick="deleteEinzahlung('${e.id}','${t.id}',${e.amount})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.85rem;padding:2px 4px" title="R\u00fckg\u00e4ngig">🗑</button>
+            </div>`).join('')}
+        </div>` : '';
+      return `<div class="topf-card" draggable="true" data-id="${t.id}" data-type="topf" data-idx="${i}">
       <div class="topf-head">
         <div class="drag-handle" style="margin-right:4px">⠿</div>
         <div class="topf-emoji">${t.emoji||'\u{1F4B0}'}</div>
         <div class="topf-name">${h(t.name)}</div>
         <div class="topf-total">${eur(t.total)}</div>
+        <span title="${checked?'Diesen Monat eingezahlt':'Noch nicht eingezahlt'}" style="font-size:1.2rem;cursor:default">${checked?'\u2705':'\u2B55'}</span>
         <button class="icon-btn edit" onclick="openEdit('topf','${t.id}')">✏️</button>
         <button class="icon-btn" onclick="deleteTopfById('${t.id}')">🗑</button>
       </div>
@@ -1164,10 +1179,12 @@ function renderSparen() {
         <span>Monatlich geplant: ${eur(t.monthly)}</span>
         <span style="color:var(--accent)">Gesamt: ${eur(t.total)}</span>
       </div>
-      <button onclick="einzahlen('topf','${t.id}',${t.total})" style="width:100%;margin-top:6px;padding:7px;border-radius:8px;border:1px solid var(--accent);background:var(--accent-glow);color:var(--accent);font-family:inherit;font-size:0.82rem;cursor:pointer;font-weight:600">
-        \u2795 Einzahlen
+      ${histHtml}
+      <button onclick="einzahlen('topf','${t.id}',${t.total})" style="width:100%;margin-top:6px;padding:7px;border-radius:8px;border:1px solid ${checked?'var(--success)':'var(--accent)'};background:${checked?'rgba(74,222,128,0.08)':'var(--accent-glow)'};color:${checked?'var(--success)':'var(--accent)'};font-family:inherit;font-size:0.82rem;cursor:pointer;font-weight:600">
+        ${checked?'\u2705 Nochmal einzahlen':'\u2795 Einzahlen'}
       </button>
-    </div>`).join('');
+    </div>`;
+    }).join('');
     makeSortable(el, 'topf');
   }
 
@@ -1305,9 +1322,41 @@ async function einzahlen(type, id, currentTotal) {
   const tbl = type === 'topf' ? 'bh_topf' : 'bh_challenge';
   try {
     await api(`${tbl}?id=eq.${id}&user_hash=eq.${encodeURIComponent(UH)}`, 'PATCH', {total: newTotal});
+    if(type === 'topf') {
+      // Einzahlung in Historie speichern
+      await api('bh_topf_einzahlung', 'POST', {user_hash:UH, topf_id:id, month:CUR, amount});
+      // Häkchen setzen falls noch nicht gesetzt
+      const alreadyChecked = DATA.topf_checks.some(c=>c.topf_id===id);
+      if(!alreadyChecked) {
+        await api('bh_topf_check', 'POST', {user_hash:UH, topf_id:id, month:CUR});
+      }
+    }
     await loadAll(); renderAll();
     toast('\u{1F4B0} +' + eur(amount) + ' eingezahlt!', 'ok');
-  } catch(e) { toast('Fehler', 'err'); }
+  } catch(e) { toast('Fehler', 'err'); console.error(e); }
+}
+
+async function deleteEinzahlung(einId, topfId, amount) {
+  if(!confirm('Einzahlung von ' + eur(amount) + ' r\u00fckg\u00e4ngig machen?')) return;
+  try {
+    // Einzahlung löschen
+    await api(`bh_topf_einzahlung?id=eq.${einId}&user_hash=eq.${encodeURIComponent(UH)}`, 'DELETE');
+    // Gesamtstand reduzieren
+    const topf = DATA.topf.find(t=>t.id===topfId);
+    if(topf) {
+      const newTotal = Math.max(0, Number(topf.total) - amount);
+      await api(`bh_topf?id=eq.${topfId}&user_hash=eq.${encodeURIComponent(UH)}`, 'PATCH', {total: newTotal});
+    }
+    // Häkchen entfernen falls keine Einzahlungen mehr diesen Monat
+    await loadAll();
+    const remaining = DATA.topf_einzahlungen.filter(e=>e.topf_id===topfId);
+    if(!remaining.length) {
+      const check = DATA.topf_checks.find(c=>c.topf_id===topfId);
+      if(check) await api(`bh_topf_check?id=eq.${check.id}&user_hash=eq.${encodeURIComponent(UH)}`, 'DELETE');
+    }
+    await loadAll(); renderAll();
+    toast('R\u00fckg\u00e4ngig gemacht', 'ok');
+  } catch(e) { toast('Fehler', 'err'); console.error(e); }
 }
 
 // ── TABS ──
