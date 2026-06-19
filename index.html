@@ -742,6 +742,20 @@ body {
   </div>
 </div>
 
+<!-- MODAL Einzahlen -->
+<div class="modal-overlay" id="m-einzahlen">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="m-ein-title">Einzahlen</div>
+    <div class="form-group">
+      <label class="form-label">Betrag (€)</label>
+      <input class="form-input big" id="ein-betrag" type="number" step="0.01" min="0" placeholder="0,00" inputmode="decimal">
+    </div>
+    <button class="btn btn-primary" onclick="confirmEinzahlen()">💰 Einzahlen</button>
+    <button class="btn btn-ghost" onclick="closeModal('m-einzahlen')">Abbrechen</button>
+  </div>
+</div>
+
 <script>
 // ── CONFIG ──
 const SB_URL = 'https://iojktoupfrfembgwclqe.supabase.co';
@@ -754,6 +768,7 @@ let CUR = new Date().toISOString().slice(0,7); // YYYY-MM
 let DATA = { ein:[], fest:[], fix:[], sonst:[], topf:[], challenge:[], quick:[], topf_checks:[], topf_einzahlungen:[], challenge_checks:[], challenge_einzahlungen:[] };
 let editCtx = { type: null, id: null };
 let qSelCat = null;
+let einzahlenCtx = { type: null, id: null, currentTotal: 0 };
 
 // ── MONTH NAMES ──
 const MNAMES = ['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
@@ -1248,23 +1263,6 @@ async function deleteChallengeEinzahlung(einId, challengeId, amount) {
   } catch(e) { toast('Fehler', 'err'); console.error(e); }
 }
 
-async function einzahlenChallenge(id, currentTotal) {
-  const betrag = prompt('\u{1F3C6} Betrag einzahlen (\u20ac):');
-  if(!betrag) return;
-  const amount = parseFloat(betrag.replace(',','.'));
-  if(isNaN(amount) || amount <= 0) { toast('Ung\u00fcltiger Betrag','err'); return; }
-  const newTotal = Number(currentTotal) + amount;
-  try {
-    await api(`bh_challenge?id=eq.${id}&user_hash=eq.${encodeURIComponent(UH)}`, 'PATCH', {total: newTotal});
-    await api('bh_challenge_einzahlung', 'POST', {user_hash:UH, challenge_id:id, month:CUR, amount});
-    const alreadyChecked = DATA.challenge_checks.some(c=>c.challenge_id===id);
-    if(!alreadyChecked) {
-      await api('bh_challenge_check', 'POST', {user_hash:UH, challenge_id:id, month:CUR});
-    }
-    await loadAll(); renderAll();
-    toast('\u{1F3C6} +' + eur(amount) + ' eingezahlt!', 'ok');
-  } catch(e) { toast('Fehler', 'err'); console.error(e); }
-}
 const tableMap = {ein:'bh_ein',fest:'bh_fest',fix:'bh_fix',sonst:'bh_sonst',topf:'bh_topf',challenge:'bh_challenge'};
 
 function makeSortable(container, type) {
@@ -1366,23 +1364,31 @@ async function saveSortOrder(container, type) {
 }
 
 // ── EINZAHLEN ──
-async function einzahlen(type, id, currentTotal) {
-  const betrag = prompt('\u{1F4B0} Betrag einzahlen (\u20ac):');
-  if(!betrag) return;
-  const amount = parseFloat(betrag.replace(',','.'));
-  if(isNaN(amount) || amount <= 0) { toast('Ung\u00fcltiger Betrag','err'); return; }
+function einzahlen(type, id, currentTotal) {
+  einzahlenCtx = {type, id, currentTotal};
+  document.getElementById('m-ein-title').textContent = type==='topf' ? '\u{1F4B0} Sparziel einzahlen' : '\u{1F3C6} Challenge einzahlen';
+  document.getElementById('ein-betrag').value = '';
+  document.getElementById('m-einzahlen').classList.add('open');
+  setTimeout(()=>document.getElementById('ein-betrag').focus(), 200);
+}
+function einzahlenChallenge(id, currentTotal) { einzahlen('challenge', id, currentTotal); }
+
+async function confirmEinzahlen() {
+  const amount = parseFloat(document.getElementById('ein-betrag').value);
+  if(isNaN(amount) || amount <= 0) { toast('Betrag eingeben','err'); return; }
+  closeModal('m-einzahlen');
+  const {type, id, currentTotal} = einzahlenCtx;
   const newTotal = Number(currentTotal) + amount;
-  const tbl = type === 'topf' ? 'bh_topf' : 'bh_challenge';
+  const tbl = type==='topf' ? 'bh_topf' : 'bh_challenge';
+  const einTbl = type==='topf' ? 'bh_topf_einzahlung' : 'bh_challenge_einzahlung';
+  const checkTbl = type==='topf' ? 'bh_topf_check' : 'bh_challenge_check';
+  const idField = type==='topf' ? 'topf_id' : 'challenge_id';
+  const checksArr = type==='topf' ? DATA.topf_checks : DATA.challenge_checks;
   try {
     await api(`${tbl}?id=eq.${id}&user_hash=eq.${encodeURIComponent(UH)}`, 'PATCH', {total: newTotal});
-    if(type === 'topf') {
-      // Einzahlung in Historie speichern
-      await api('bh_topf_einzahlung', 'POST', {user_hash:UH, topf_id:id, month:CUR, amount});
-      // Häkchen setzen falls noch nicht gesetzt
-      const alreadyChecked = DATA.topf_checks.some(c=>c.topf_id===id);
-      if(!alreadyChecked) {
-        await api('bh_topf_check', 'POST', {user_hash:UH, topf_id:id, month:CUR});
-      }
+    await api(einTbl, 'POST', {user_hash:UH, [idField]:id, month:CUR, amount});
+    if(!checksArr.some(c=>c[idField]===id)) {
+      await api(checkTbl, 'POST', {user_hash:UH, [idField]:id, month:CUR});
     }
     await loadAll(); renderAll();
     toast('\u{1F4B0} +' + eur(amount) + ' eingezahlt!', 'ok');
@@ -1591,7 +1597,7 @@ async function deleteChallengeById(id) {
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
 // Close on overlay click
-['m-simple','m-topf','m-challenge'].forEach(id=>{
+['m-simple','m-topf','m-challenge','m-einzahlen'].forEach(id=>{
   document.getElementById(id).addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal(id);});
 });
 
