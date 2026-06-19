@@ -751,7 +751,7 @@ const HASH_PFX = 'nt5_';
 // ── STATE ──
 let UH = null; // user hash
 let CUR = new Date().toISOString().slice(0,7); // YYYY-MM
-let DATA = { ein:[], fest:[], fix:[], sonst:[], topf:[], challenge:[], quick:[], topf_checks:[], topf_einzahlungen:[] };
+let DATA = { ein:[], fest:[], fix:[], sonst:[], topf:[], challenge:[], quick:[], topf_checks:[], topf_einzahlungen:[], challenge_checks:[], challenge_einzahlungen:[] };
 let editCtx = { type: null, id: null };
 let qSelCat = null;
 
@@ -872,11 +872,13 @@ async function loadAll() {
     api(`bh_sonst?${q}&order=sort_order.asc,created_at.desc`).catch(()=>[]),
     api(`bh_quick?${q}&order=created_at.desc&limit=30`).catch(()=>[]),
   ]);
-  [DATA.topf, DATA.challenge, DATA.topf_checks, DATA.topf_einzahlungen] = await Promise.all([
+  [DATA.topf, DATA.challenge, DATA.topf_checks, DATA.topf_einzahlungen, DATA.challenge_checks, DATA.challenge_einzahlungen] = await Promise.all([
     api(`bh_topf?${qAll}&order=sort_order.asc,created_at.asc`).catch(()=>[]),
     api(`bh_challenge?${qAll}&order=sort_order.asc,created_at.asc`).catch(()=>[]),
     api(`bh_topf_check?user_hash=eq.${enc}&month=eq.${CUR}`).catch(()=>[]),
     api(`bh_topf_einzahlung?user_hash=eq.${enc}&month=eq.${CUR}&order=created_at.desc`).catch(()=>[]),
+    api(`bh_challenge_check?user_hash=eq.${enc}&month=eq.${CUR}`).catch(()=>[]),
+    api(`bh_challenge_einzahlung?user_hash=eq.${enc}&month=eq.${CUR}&order=created_at.desc`).catch(()=>[]),
   ]);
 }
 
@@ -1192,26 +1194,77 @@ function renderSparen() {
   const ec=document.getElementById('list-challenge');
   if(!DATA.challenge.length){ ec.innerHTML='<div class="empty"><div class="empty-icon">\u{1F3C6}</div>Noch keine Challenges</div>'; }
   else {
-    ec.innerHTML=DATA.challenge.map((c,i)=>`<div class="data-row" draggable="true" data-id="${c.id}" data-type="challenge" data-idx="${i}" style="flex-direction:column;align-items:stretch;gap:6px">
-      <div style="display:flex;align-items:center;gap:8px">
-        <div class="drag-handle">⠿</div>
-        <div class="row-emoji">${c.emoji||'\u{1F3C6}'}</div>
-        <div style="flex:1">
-          <div class="row-name">${h(c.name)}</div>
-          <div class="row-sub">Basis: ${eur(c.basis)} | Monat: +${eur(c.monthly)} | Gesamt: ${eur(c.total)}</div>
+    ec.innerHTML=DATA.challenge.map((c,i)=>{
+      const checked = DATA.challenge_checks.some(x=>x.challenge_id===c.id);
+      const einzahlungen = DATA.challenge_einzahlungen.filter(e=>e.challenge_id===c.id);
+      const histHtml = einzahlungen.length ? `
+        <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
+          ${einzahlungen.map(e=>`
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;padding:3px 0">
+              <span style="color:var(--muted)">${new Date(e.created_at).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}</span>
+              <span style="font-family:var(--mono);color:var(--success)">+${eur(e.amount)}</span>
+              <button onclick="deleteChallengeEinzahlung('${e.id}','${c.id}',${e.amount})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.85rem;padding:2px 4px" title="R\u00fckg\u00e4ngig">🗑</button>
+            </div>`).join('')}
+        </div>` : '';
+      return `<div class="data-row" draggable="true" data-id="${c.id}" data-type="challenge" data-idx="${i}" style="flex-direction:column;align-items:stretch;gap:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="drag-handle">⠿</div>
+          <div class="row-emoji">${c.emoji||'\u{1F3C6}'}</div>
+          <div style="flex:1">
+            <div class="row-name">${h(c.name)}</div>
+            <div class="row-sub">Basis: ${eur(c.basis)} | Monat: +${eur(c.monthly)} | Gesamt: ${eur(c.total)}</div>
+          </div>
+          <span title="${checked?'Diesen Monat eingezahlt':'Noch nicht eingezahlt'}" style="font-size:1.2rem;cursor:default">${checked?'\u2705':'\u2B55'}</span>
+          <button class="icon-btn edit" onclick="openEdit('challenge','${c.id}')">✏️</button>
+          <button class="icon-btn" onclick="deleteChallengeById('${c.id}')">🗑</button>
         </div>
-        <button class="icon-btn edit" onclick="openEdit('challenge','${c.id}')">✏️</button>
-        <button class="icon-btn" onclick="deleteChallengeById('${c.id}')">🗑</button>
-      </div>
-      <button onclick="einzahlen('challenge','${c.id}',${c.total})" style="width:100%;padding:7px;border-radius:8px;border:1px solid var(--accent);background:var(--accent-glow);color:var(--accent);font-family:inherit;font-size:0.82rem;cursor:pointer;font-weight:600">
-        \u2795 Einzahlen
-      </button>
-    </div>`).join('');
+        ${histHtml}
+        <button onclick="einzahlenChallenge('${c.id}',${c.total})" style="width:100%;padding:7px;border-radius:8px;border:1px solid ${checked?'var(--success)':'var(--accent)'};background:${checked?'rgba(74,222,128,0.08)':'var(--accent-glow)'};color:${checked?'var(--success)':'var(--accent)'};font-family:inherit;font-size:0.82rem;cursor:pointer;font-weight:600">
+          ${checked?'\u2705 Nochmal einzahlen':'\u2795 Einzahlen'}
+        </button>
+      </div>`;
+    }).join('');
     makeSortable(ec, 'challenge');
   }
 }
 
-// ── SORTABLE ──
+async function deleteChallengeEinzahlung(einId, challengeId, amount) {
+  if(!confirm('Einzahlung von ' + eur(amount) + ' r\u00fckg\u00e4ngig machen?')) return;
+  try {
+    await api(`bh_challenge_einzahlung?id=eq.${einId}&user_hash=eq.${encodeURIComponent(UH)}`, 'DELETE');
+    const challenge = DATA.challenge.find(c=>c.id===challengeId);
+    if(challenge) {
+      const newTotal = Math.max(0, Number(challenge.total) - amount);
+      await api(`bh_challenge?id=eq.${challengeId}&user_hash=eq.${encodeURIComponent(UH)}`, 'PATCH', {total: newTotal});
+    }
+    await loadAll();
+    const remaining = DATA.challenge_einzahlungen.filter(e=>e.challenge_id===challengeId);
+    if(!remaining.length) {
+      const check = DATA.challenge_checks.find(c=>c.challenge_id===challengeId);
+      if(check) await api(`bh_challenge_check?id=eq.${check.id}&user_hash=eq.${encodeURIComponent(UH)}`, 'DELETE');
+    }
+    await loadAll(); renderAll();
+    toast('R\u00fckg\u00e4ngig gemacht', 'ok');
+  } catch(e) { toast('Fehler', 'err'); console.error(e); }
+}
+
+async function einzahlenChallenge(id, currentTotal) {
+  const betrag = prompt('\u{1F3C6} Betrag einzahlen (\u20ac):');
+  if(!betrag) return;
+  const amount = parseFloat(betrag.replace(',','.'));
+  if(isNaN(amount) || amount <= 0) { toast('Ung\u00fcltiger Betrag','err'); return; }
+  const newTotal = Number(currentTotal) + amount;
+  try {
+    await api(`bh_challenge?id=eq.${id}&user_hash=eq.${encodeURIComponent(UH)}`, 'PATCH', {total: newTotal});
+    await api('bh_challenge_einzahlung', 'POST', {user_hash:UH, challenge_id:id, month:CUR, amount});
+    const alreadyChecked = DATA.challenge_checks.some(c=>c.challenge_id===id);
+    if(!alreadyChecked) {
+      await api('bh_challenge_check', 'POST', {user_hash:UH, challenge_id:id, month:CUR});
+    }
+    await loadAll(); renderAll();
+    toast('\u{1F3C6} +' + eur(amount) + ' eingezahlt!', 'ok');
+  } catch(e) { toast('Fehler', 'err'); console.error(e); }
+}
 const tableMap = {ein:'bh_ein',fest:'bh_fest',fix:'bh_fix',sonst:'bh_sonst',topf:'bh_topf',challenge:'bh_challenge'};
 
 function makeSortable(container, type) {
