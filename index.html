@@ -764,7 +764,7 @@ const HASH_PFX = 'nt5_';
 
 // ── STATE ──
 let UH = null; // user hash
-let CUR = new Date().toISOString().slice(0,7); // YYYY-MM
+let CUR = localStorage.getItem('bh_month') || new Date().toISOString().slice(0,7);
 let DATA = { ein:[], fest:[], fix:[], sonst:[], topf:[], challenge:[], quick:[], topf_checks:[], topf_einzahlungen:[], challenge_checks:[], challenge_einzahlungen:[] };
 let editCtx = { type: null, id: null };
 let qSelCat = null;
@@ -871,6 +871,7 @@ function doLogout() {
 // ── MONTH NAV ──
 function changeMonth(d) {
   CUR = d<0 ? prevMonth(CUR) : nextMonth(CUR);
+  localStorage.setItem('bh_month', CUR);
   document.getElementById('month-lbl').textContent=monthLabel(CUR);
   loadAll().then(renderAll);
 }
